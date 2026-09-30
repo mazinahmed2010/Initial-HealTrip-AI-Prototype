@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Hospital {
+  id           String   @id @default(cuid())
+  name         String
+  nameAr       String
+  city         String
+  address      String
+  phone        String
+  emergency    Boolean  @default(false)
+  active       Boolean  @default(true)
+  specialties  String[]
+  doctors      Doctor[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Doctor {
+  id           String   @id @default(cuid())
+  name         String
+  nameAr       String
+  specialty    String
+  specialtyAr  String
+  city         String
+  languages    String[]
+  active       Boolean  @default(true)
+  hospitalId   String
+  hospital     Hospital @relation(fields: [hospitalId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([specialty, city])
+  @@index([hospitalId])
+}
