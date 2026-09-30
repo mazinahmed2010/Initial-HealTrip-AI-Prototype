@@ -141,7 +141,7 @@ Response:
 
 ### GET `/api/providers`
 
-Returns active mock hospitals and their active doctors.
+Returns active provider records from PostgreSQL when available, with the built-in demo catalog as a fallback. The catalog contains 6 fictional hospitals and 17 fictional doctors across Riyadh, Jeddah, Dammam, Makkah, Madinah and Buraydah. Names and records are for demonstration only; they do not represent real clinicians, facilities, contact details or appointment availability.
 
 ## 7. Run locally
 
@@ -186,6 +186,8 @@ npm run db:push
 ```bash
 npm run db:seed
 ```
+
+The seed command loads the same demo catalog used by the assistant when PostgreSQL is unavailable.
 
 ### Start application
 

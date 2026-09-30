@@ -1,11 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import type { ProviderOption } from "@/lib/provider-data";
 
 type Message = {
   role: "user" | "assistant";
   content: string;
   toolUsed?: boolean;
+  language?: "en" | "ar";
+  providers?: ProviderOption[];
+  stage?: "clarification" | "safety" | "recommendation" | "provider_search" | "response";
 };
 
 const examples = [
@@ -18,8 +22,9 @@ export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
+      language: "en",
       content:
-        "Hello. I’m HealTrip AI. I can help you think through the next care step and search verified prototype provider data. I cannot diagnose medical conditions."
+        "Hello. I’m HealTrip AI. I can help you think through the next care step and search demo provider options. Provider records are fictional and are not a real care directory. I cannot diagnose medical conditions."
     }
   ]);
   const [input, setInput] = useState("");
@@ -30,7 +35,8 @@ export default function Chat() {
     const value = text.trim();
     if (!value || loading) return;
 
-    setMessages((m) => [...m, { role: "user", content: value }]);
+    const language = /[\u0600-\u06ff]/u.test(value) ? "ar" : "en";
+    setMessages((m) => [...m, { role: "user", content: value, language }]);
     setInput("");
     setLoading(true);
 
@@ -38,7 +44,10 @@ export default function Chat() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: value })
+        body: JSON.stringify({
+          message: value,
+          history: messages.slice(-12).map(({ role, content, stage }) => ({ role, content, stage }))
+        })
       });
       const data = await res.json();
 
@@ -47,7 +56,10 @@ export default function Chat() {
         {
           role: "assistant",
           content: data.error || data.text || "No response.",
-          toolUsed: data.toolUsed
+          toolUsed: data.toolUsed,
+          language: /[\u0600-\u06ff]/u.test(data.text || "") ? "ar" : "en",
+          providers: Array.isArray(data.providers) ? data.providers : [],
+          stage: data.stage
         }
       ]);
     } catch {
@@ -88,11 +100,50 @@ export default function Chat() {
       <section className="chat">
         <div className="messages">
           {messages.map((m, i) => (
-            <div key={i} className={`message ${m.role}`}>
+            <div key={i} className={`message ${m.role}`} dir={m.language === "ar" ? "rtl" : "ltr"}>
               <div className="bubble">
                 {m.content}
-                {m.toolUsed && <div className="tool-badge">✓ Verified database tool used</div>}
+                {m.stage && m.stage !== "response" && (
+                  <div className="workflow-step">
+                    {m.language === "ar"
+                      ? m.stage === "clarification"
+                        ? "استيضاح"
+                        : m.stage === "safety"
+                          ? "تقييم السلامة"
+                          : m.stage === "recommendation"
+                            ? "الخطوة التالية"
+                            : "بحث مقدمي الرعاية"
+                      : m.stage === "clarification"
+                        ? "Clarification"
+                        : m.stage === "safety"
+                          ? "Safety assessment"
+                          : m.stage === "recommendation"
+                            ? "Next-step recommendation"
+                            : "Provider search"}
+                  </div>
+                )}
+                {m.toolUsed && (
+                  <div className="tool-badge">
+                    {m.language === "ar" ? "تم البحث في دليل البيانات التجريبي" : "Demo provider directory searched"}
+                  </div>
+                )}
               </div>
+              {!!m.providers?.length && (
+                <div className="provider-options" aria-label={m.language === "ar" ? "خيارات مقدمي الرعاية التجريبية" : "Demo provider options"}>
+                  {m.providers.map((provider) => (
+                    <article className="provider-option" key={provider.id}>
+                      <strong>{m.language === "ar" ? provider.nameAr : provider.name}</strong>
+                      {provider.specialty && (
+                        <span>{m.language === "ar" ? provider.specialtyAr : provider.specialty}</span>
+                      )}
+                      <span>{m.language === "ar" ? provider.cityAr : provider.city}</span>
+                      {provider.type === "doctor" && (
+                        <small>{m.language === "ar" ? provider.hospitalNameAr : provider.hospitalName}</small>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
           {loading && (

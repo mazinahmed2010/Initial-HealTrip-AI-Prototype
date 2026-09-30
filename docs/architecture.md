@@ -3,17 +3,27 @@
 ## Request lifecycle
 
 1. User submits a message.
-2. Client sends `POST /api/chat`.
-3. Zod validates the payload.
-4. Agent receives the message with the safety system instructions.
-5. Agent either:
-   - asks a clarifying question, or
-   - calls a verified search tool.
-6. Tool executes server-side.
-7. Prisma queries PostgreSQL.
-8. Tool result is returned to the agent.
-9. Agent generates a user-facing response using only verified provider records.
-10. Client renders the response.
+2. Client sends `POST /api/chat` with the recent conversation history.
+3. Zod validates the message and bounded history.
+4. The workflow asks for missing symptom or provider details.
+5. The safety gate checks urgent symptoms before routine care suggestions.
+6. The assistant gives a next-step recommendation when needed.
+7. Provider searches run only after clarification and safety checks pass.
+8. Search tools query PostgreSQL and fall back to the shared demo catalog if needed.
+9. The assistant returns matching database records as patient options.
+10. The client renders the response, workflow stage and options in the user's language.
+
+```mermaid
+flowchart TD
+  A[Clarifying Questions] --> B[Safety Assessment]
+  B -->|Urgent symptoms| C[Emergency Guidance]
+  B -->|Safe for routine care| D[Next-Step Recommendation]
+  D --> E[Tool Calling]
+  E --> F[Provider Search]
+  F --> G[Doctors and Hospitals from Database]
+```
+
+Provider records in this prototype are fictional demo data. A database match does not verify a clinician, facility, appointment, or real-world availability.
 
 ## Trust boundaries
 
@@ -25,16 +35,16 @@ Browser
 API validation
   │
   ▼
-Agent
+Clarification and safety workflow
   │
-  │ tool request
+  │ approved provider search
   ▼
 Server-side tools
   │
   ▼
 Database
   │
-  │ verified records
+  │ matched demo records
   ▼
 Agent response
 ```

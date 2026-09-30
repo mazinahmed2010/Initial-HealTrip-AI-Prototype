@@ -76,6 +76,7 @@ button, textarea { font: inherit; }
 }
 
 .message { display: flex; margin: 10px 0; }
+.message.assistant { display: block; }
 .message.user { justify-content: flex-end; }
 .bubble {
   max-width: 78%;
@@ -92,6 +93,38 @@ button, textarea { font: inherit; }
   font-size: 11px;
   opacity: .8;
 }
+
+.workflow-step {
+  width: fit-content;
+  margin-top: 9px;
+  padding: 3px 7px;
+  border: 1px solid #c8ded9;
+  border-radius: 6px;
+  color: var(--primary-dark);
+  background: #f8fbfa;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.provider-options {
+  display: grid;
+  gap: 8px;
+  width: min(78%, 620px);
+  margin-top: 8px;
+}
+
+.provider-option {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.provider-option small { color: var(--muted); }
 
 .typing { opacity: .65; }
 
@@ -152,5 +185,6 @@ footer {
 @media (max-width: 650px) {
   .shell { padding: 14px 10px; }
   .bubble { max-width: 90%; }
+  .provider-options { width: 90%; }
   .composer { flex-direction: column; align-items: stretch; }
 }
