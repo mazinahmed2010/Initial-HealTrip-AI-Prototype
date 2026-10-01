@@ -132,6 +132,11 @@ export default function Chat() {
                 <div className="provider-options" aria-label={m.language === "ar" ? "خيارات مقدمي الرعاية التجريبية" : "Demo provider options"}>
                   {m.providers.map((provider) => (
                     <article className="provider-option" key={provider.id}>
+                      <span className="provider-type">
+                        {m.language === "ar"
+                          ? provider.type === "doctor" ? "طبيب" : "مستشفى"
+                          : provider.type === "doctor" ? "Doctor" : "Hospital"}
+                      </span>
                       <strong>{m.language === "ar" ? provider.nameAr : provider.name}</strong>
                       {provider.specialty && (
                         <span>{m.language === "ar" ? provider.specialtyAr : provider.specialty}</span>

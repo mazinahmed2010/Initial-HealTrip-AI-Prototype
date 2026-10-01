@@ -96,6 +96,14 @@ export async function searchHospitals(input: unknown) {
   return searchDemoHospitals(filters);
 }
 
+async function searchCareOptions(filters: ProviderFilters) {
+  const [doctors, hospitals] = await Promise.all([
+    searchDoctors(filters),
+    searchHospitals(filters)
+  ]);
+  return [...doctors, ...hospitals];
+}
+
 const tools: OpenAI.Responses.Tool[] = [
   {
     type: "function",
@@ -130,7 +138,7 @@ const tools: OpenAI.Responses.Tool[] = [
 const systemPrompt = `
 You are HealTrip AI Patient Decision Assistant, a prototype support tool.
 
-Follow this order: clarify missing details, assess urgent symptoms, recommend the next care step, then search providers only when appropriate. For routine provider requests, tell the user to confirm services and availability directly with the facility before presenting matches.
+Follow this order: clarify missing details, assess urgent symptoms, recommend the next care step, then search providers only when appropriate. Return both matching doctors and hospitals when available. For routine provider requests, tell the user to confirm services and availability directly with the facility before presenting matches.
 
 Safety:
 - You are not a doctor and must not diagnose.
@@ -281,9 +289,7 @@ async function mockResponse(message: string, plan: WorkflowPlan): Promise<Assist
   const hasAny = (terms: string[]) => terms.some((term) => lower.includes(term));
 
   if (plan.providerIntent) {
-    const providers = plan.hospitalIntent
-      ? await searchHospitals(plan.filters)
-      : await searchDoctors(plan.filters);
+    const providers = await searchCareOptions(plan.filters);
     const safetyNote = plan.context.toLowerCase().includes("chest pain") || plan.context.includes("ألم في الصدر")
       ? isArabic
         ? "اطلب تقييمًا طبيًا إذا استمر الألم، والطوارئ فورًا إذا ظهرت علامات شديدة. "
@@ -293,8 +299,8 @@ async function mockResponse(message: string, plan: WorkflowPlan): Promise<Assist
         : "For routine care, contact the facility directly to confirm services and availability. ";
     const text = safetyNote + (providers.length
       ? isArabic
-        ? "هذه خيارات تجريبية مطابقة لطلبك. البيانات خيالية وليست لمقدمي رعاية حقيقيين، ولا تتضمن توفر المواعيد."
-        : "These demo options match your request. Records are fictional, not real providers, and do not include appointment availability."
+        ? "هذه خيارات الأطباء والمستشفيات التجريبية المطابقة لطلبك. البيانات خيالية وليست لمقدمي رعاية حقيقيين، ولا تتضمن توفر المواعيد."
+        : "These matching demo doctors and hospitals may fit your request. Records are fictional, not real providers, and do not include appointment availability."
       : isArabic
         ? "لم أجد خيارًا مطابقًا في دليل البيانات التجريبية. جرّب مدينة أو تخصصًا آخر."
         : "I couldn't find a match in the demo directory. Try another city or specialty.");
@@ -345,7 +351,11 @@ export async function runAssistant(message: string, history: ConversationTurn[] 
     input: transcript,
     tools,
     tool_choice: plan.providerIntent ? "required" : "none"
+  }).catch((error: unknown) => {
+    console.error("OpenAI request failed; using the local workflow.", error);
+    return null;
   });
+  if (!first) return mockResponse(message, plan);
 
   const toolOutputs: OpenAI.Responses.ResponseInputItem[] = [];
   const providerOptions: ProviderOption[] = [];
@@ -359,12 +369,12 @@ export async function runAssistant(message: string, history: ConversationTurn[] 
     let result: unknown;
 
     if (item.name === "search_doctors") {
-      const matches = await searchDoctors(args);
-      result = matches;
+      const matches = await searchCareOptions(SearchInput.parse(args));
+      result = { doctors: matches.filter((option) => option.type === "doctor"), hospitals: matches.filter((option) => option.type === "hospital") };
       providerOptions.push(...matches);
     } else if (item.name === "search_hospitals") {
-      const matches = await searchHospitals(args);
-      result = matches;
+      const matches = await searchCareOptions(SearchInput.parse(args));
+      result = { doctors: matches.filter((option) => option.type === "doctor"), hospitals: matches.filter((option) => option.type === "hospital") };
       providerOptions.push(...matches);
     }
     else result = { error: "Unknown tool" };
@@ -392,13 +402,17 @@ export async function runAssistant(message: string, history: ConversationTurn[] 
     previous_response_id: first.id,
     input: [...toolOutputs],
     tools
+  }).catch((error: unknown) => {
+    console.error("OpenAI follow-up failed; using local provider results.", error);
+    return null;
   });
+  if (!second) return mockResponse(message, plan);
 
   return {
     text: second.output_text,
     stage: "provider_search",
     toolUsed: true,
     emergency: false,
-    providers: providerOptions
+    providers: [...new Map(providerOptions.map((option) => [`${option.type}:${option.id}`, option])).values()]
   };
 }
